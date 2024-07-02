@@ -48,6 +48,8 @@ class Client():
                 if result_dict["action"] == "result":
                     result_1 = result_dict
                     print("rtasr result: " + result_1["data"])
+                    text = ''.join([word['cw'][0]['w'] for word in json.loads(result_1["data"])['cn']['st']['rt'][0]['ws']])
+                    return text
 
                 if result_dict["action"] == "error":
                     print("rtasr error: " + result)
