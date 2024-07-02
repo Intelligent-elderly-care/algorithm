@@ -32,6 +32,11 @@ conversation = ConversationChain(
     memory=memory,
 )
 
+# Global variables
+recording = False
+client = None  # Global variable to hold Client instance
+hitory = []
+
 # Initialize pyttsx3 engine
 def play_audio(response):
     engine = pyttsx3.init()
@@ -69,6 +74,7 @@ class Client():
         self.ws = create_connection(base_url + "?appid=" + app_id + "&ts=" + ts + "&signa=" + quote(signa))
         self.trecv = threading.Thread(target=self.recv)
         self.trecv.start()
+        self.transcript = []
 
     def send(self, audio_data):
         self.ws.send(audio_data)
@@ -84,7 +90,8 @@ class Client():
                 if result_dict["action"] == "result":
                     result_1 = result_dict
                     text = ''.join([word['cw'][0]['w'] for word in json.loads(result_1["data"])['cn']['st']['rt'][0]['ws']])
-                    return text
+                    print("text:" + text)
+                    self.transcript.append(text)
                 
                 if result_dict["action"] == "error":
                     self.ws.close()
@@ -93,10 +100,39 @@ class Client():
             pass
 
     def close(self):
-        self.ws.send(bytes(self.end_tag.encode('utf-8')))
-        self.ws.close()
+        if self.ws.connected:
+            self.ws.send(bytes(self.end_tag.encode('utf-8')))
+            self.ws.close()
+        return ''.join(self.transcript)
+
+# Function to handle voice input
+def handle_voice_input():
+    global recording, client
+    app_id = "fe3506b5"
+    api_key = "2d473887b44f3e6e10f6fac2a7503b50"
+    client = Client(app_id, api_key)  # Save Client instance globally
+    recording = True
+    threading.Thread(target=record_and_send_audio, args=(client,)).start()
+
+def stop_voice_input():
+    global recording, client
+    recording = False
+
+    # Get the transcribed text from the saved Client instance
+    if client:
+        text = client.close()
+        print("responseText:" + text)
+        if text:
+            responses, history = predict(text)
+            print(f'responses: {responses}')
+            return responses, history
+        else:
+            return "", []
+    else:
+        return "", []
 
 def record_and_send_audio(client):
+    global recording
     CHUNK = 1280
     FORMAT = pyaudio.paInt16
     CHANNELS = 1
@@ -105,23 +141,18 @@ def record_and_send_audio(client):
     p = pyaudio.PyAudio()
     stream = p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, frames_per_buffer=CHUNK)
 
-    try:
-        while True:
-            data = stream.read(CHUNK)
-            client.send(data)
-            time.sleep(0.04)
-    except KeyboardInterrupt:
-        client.close()
+    print("Recording...")
+
+    while recording:
+        data = stream.read(CHUNK)
+        client.send(data)
+        time.sleep(0.04)
+
+    text = client.close()
     stream.stop_stream()
     stream.close()
     p.terminate()
-
-# Function to handle voice input
-def handle_voice_input():
-    app_id = "fe3506b5"
-    api_key = "2d473887b44f3e6e10f6fac2a7503b50"
-    client = Client(app_id, api_key)
-    text = record_and_send_audio(client)
+    print("Recording stopped text:" + text)
     return text
 
 with gr.Blocks(css="#chatbot{height:800px} .overflow-y-auto{height:800px}") as demo:
@@ -130,9 +161,11 @@ with gr.Blocks(css="#chatbot{height:800px} .overflow-y-auto{height:800px}") as d
 
     with gr.Row():
         txt = gr.Textbox(show_label=False, placeholder="Enter text and press enter")
-        voice_btn = gr.Button("Voice Input")
+        voice_btn = gr.Button("Start Voice Input")
+        stop_btn = gr.Button("Stop Voice Input")
 
     txt.submit(predict, [txt, state], [chatbot, state])
-    voice_btn.click(handle_voice_input, [], txt)
+    voice_btn.click(handle_voice_input)
+    stop_btn.click(stop_voice_input, outputs=[chatbot, state])
 
 demo.launch()
