@@ -26,7 +26,7 @@ import websockets
 
 appid = "5042724845"    # 项目的 appid
 token = "xxx"    # 项目的 token
-cluster = "xxx"  # 请求的集群
+cluster = ""  # 请求的集群
 audio_path = ""  # 本地音频路径
 audio_format = "wav"   # wav 或者 mp3，根据实际音频格式设置
 
