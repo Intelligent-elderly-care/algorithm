@@ -171,8 +171,8 @@ def record_and_send_audio(client):
     if text:
         return text
     else:
-        # gr.Info("您的输入为空,请重新输入!")
-        raise gr.Error("您的输入为空,请重新输入!")
+        gr.Warning("您的输入为空,请重新输入!")
+        # raise gr.Error("您的输入为空,请重新输入!")
 
 with gr.Blocks(css="""
 #chatbot {height: 100vh; overflow-y: auto;}
